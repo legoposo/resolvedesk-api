@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.category import Category
 from app.schemas.category import CategoryCreate, CategoryResponse
+from app.core.auth import get_current_user
+from app.models.user import User
 
 
 router = APIRouter(
@@ -16,8 +18,15 @@ router = APIRouter(
 @router.post("/", response_model=CategoryResponse)
 def create_category(
     category_data: CategoryCreate,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    if current_user.role != "ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Apenas administradores podem criar categorias",
+        )    
+    
     existing_category = db.scalar(
         select(Category).where(Category.name == category_data.name)
     )
@@ -42,6 +51,7 @@ def create_category(
 
 @router.get("/", response_model=list[CategoryResponse])
 def list_categories(
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     categories = db.scalars(

@@ -22,3 +22,4 @@ class User(Base):
         String(20),
         default=UserRole.USER.value,
     )
+

@@ -10,6 +10,7 @@ class UserUpdate(BaseModel):
     name: str | None = None
     email: EmailStr | None = None
     password: str | None = None
+    role: str | None = None
     
 class UserResponse(BaseModel):
     id: int

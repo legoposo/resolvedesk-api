@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -7,7 +7,7 @@ from app.db.session import get_db
 from app.models.category import Category
 from app.models.ticket import Ticket, TicketStatus
 from app.models.user import User
-from app.schemas.ticket import TicketCreate, TicketResponse, TicketUpdate
+from app.schemas.ticket import TicketCreate, TicketResponse, TicketUpdate, TicketPriority
 
 
 router = APIRouter(
@@ -61,11 +61,11 @@ def get_ticket(
             detail="Chamado não encontrado",
         )
 
-    if ticket.requester_id != current_user.id:
+    if current_user.role == "USER" and ticket.requester_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Você não tem permissão para acessar este chamado",
-        )
+            detail="Você não tem permissão para alterar este chamado",
+    )
 
     return ticket
 
@@ -84,10 +84,10 @@ def update_ticket(
             detail="Chamado não encontrado",
         )
     
-    if ticket.requester_id != current_user.id:
+    if current_user.role == "USER" and ticket.requester_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Você não tem permissão para alterar este chamado",
+            detail="Você não tem permissão para acessar este chamado",
     )
 
     update_data = ticket_data.model_dump(exclude_unset=True)
@@ -117,13 +117,32 @@ def update_ticket(
 
 @router.get("/", response_model=list[TicketResponse])
 def list_tickets(
+    status_filter: TicketStatus | None = None,
+    priority: TicketPriority | None = None,
+    category_id: int | None = None,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    tickets = db.scalars(
-        select(Ticket)
-        .where(Ticket.requester_id == current_user.id)
-        .order_by(Ticket.id.desc())
-    ).all()
+    query = select(Ticket).order_by(Ticket.id.desc())
+    
+
+    if current_user.role == "USER":
+        query = query.where(Ticket.requester_id == current_user.id)
+
+    if category_id is not None:
+        query = query.where(Ticket.category_id == category_id)
+
+    if status_filter is not None:
+        query = query.where(Ticket.status == status_filter.value)
+
+    if priority is not None:
+        query = query.where(Ticket.priority == priority.value)  
+
+    query = query.offset(skip).limit(limit)
+
+    tickets = db.scalars(query).all()
 
     return tickets
+

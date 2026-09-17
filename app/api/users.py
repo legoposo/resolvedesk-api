@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session
 from app.core.security import hash_password
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.user import UserCreate, UserResponse
 from app.schemas.user import UserCreate, UserResponse, UserUpdate
 from app.core.auth import get_current_user
 
@@ -60,6 +59,7 @@ def list_users(
 @router.get("/{user_id}", response_model=UserResponse)
 def get_user(
     user_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     user = db.get(User, user_id)
@@ -70,12 +70,19 @@ def get_user(
             detail="Usuário não encontrado",
         )
 
+    if current_user.role != "ADMIN" and current_user.id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Você não tem permissão para acessar este usuário",
+        )
+
     return user
 
 @router.patch("/{user_id}", response_model=UserResponse)
 def update_user(
     user_id: int,
     user_data: UserUpdate,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     user = db.get(User, user_id)
@@ -84,6 +91,12 @@ def update_user(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Usuário não encontrado",
+        )
+
+    if current_user.role != "ADMIN" and current_user.id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Você não tem permissão para alterar este usuário",
         )
 
     if user_data.name is not None:
@@ -107,6 +120,21 @@ def update_user(
 
     if user_data.password is not None:
         user.hashed_password = hash_password(user_data.password)
+
+    if user_data.role is not None:
+        if current_user.role != "ADMIN":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Apenas administradores podem alterar o perfil do usuário",
+            )
+
+        if user_data.role not in ["USER", "SUPPORT", "ADMIN"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Perfil de usuário inválido",
+            )
+
+        user.role = user_data.role    
 
     db.commit()
     db.refresh(user)
