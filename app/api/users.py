@@ -2,12 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.auth import get_current_user
 from app.core.security import hash_password
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.user import UserCreate, UserResponse, UserUpdate
-from app.core.auth import get_current_user
-
 
 
 router = APIRouter(
@@ -16,7 +15,16 @@ router = APIRouter(
 )
 
 
-@router.post("/", response_model=UserResponse)
+@router.post(
+    "/",
+    response_model=UserResponse,
+    summary="Cadastrar usuário",
+    description=(
+        "Cria um novo usuário no sistema. "
+        "O e-mail deve ser único e a senha é armazenada de forma segura "
+        "utilizando hash."
+    ),
+)
 def create_user(
     user_data: UserCreate,
     db: Session = Depends(get_db),
@@ -43,7 +51,16 @@ def create_user(
 
     return user
 
-@router.get("/", response_model=list[UserResponse])
+
+@router.get(
+    "/",
+    response_model=list[UserResponse],
+    summary="Listar usuários",
+    description=(
+        "Lista todos os usuários cadastrados no sistema. "
+        "Este endpoint é exclusivo para usuários com perfil ADMIN."
+    ),
+)
 def list_users(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -56,7 +73,17 @@ def list_users(
 
     return db.query(User).all()
 
-@router.get("/{user_id}", response_model=UserResponse)
+
+@router.get(
+    "/{user_id}",
+    response_model=UserResponse,
+    summary="Consultar usuário",
+    description=(
+        "Retorna os dados de um usuário específico. "
+        "Usuários comuns podem consultar apenas o próprio cadastro. "
+        "Administradores podem consultar qualquer usuário."
+    ),
+)
 def get_user(
     user_id: int,
     current_user: User = Depends(get_current_user),
@@ -78,7 +105,18 @@ def get_user(
 
     return user
 
-@router.patch("/{user_id}", response_model=UserResponse)
+
+@router.patch(
+    "/{user_id}",
+    response_model=UserResponse,
+    summary="Atualizar usuário",
+    description=(
+        "Atualiza os dados de um usuário existente. "
+        "O próprio usuário pode alterar nome, e-mail e senha. "
+        "Apenas administradores podem alterar o perfil de acesso "
+        "entre USER, SUPPORT e ADMIN."
+    ),
+)
 def update_user(
     user_id: int,
     user_data: UserUpdate,
@@ -134,7 +172,7 @@ def update_user(
                 detail="Perfil de usuário inválido",
             )
 
-        user.role = user_data.role    
+        user.role = user_data.role
 
     db.commit()
     db.refresh(user)

@@ -15,7 +15,15 @@ router = APIRouter(
 )
 
 
-@router.post("/login")
+@router.post(
+    "/login",
+    summary="Autenticar usuário",
+    description=(
+        "Autentica um usuário utilizando e-mail e senha. "
+        "Quando as credenciais são válidas, retorna um token JWT "
+        "que deve ser enviado nas rotas protegidas."
+    ),
+)
 def login(
     login_data: LoginRequest,
     db: Session = Depends(get_db),
@@ -49,7 +57,14 @@ def login(
     }
 
 
-@router.get("/me")
+@router.get(
+    "/me",
+    summary="Consultar usuário autenticado",
+    description=(
+        "Retorna os dados básicos do usuário autenticado "
+        "a partir do token JWT enviado no cabeçalho Authorization."
+    ),
+)
 def get_me(
     current_user: User = Depends(get_current_user),
 ):
